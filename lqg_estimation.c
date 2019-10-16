@@ -20,7 +20,10 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 
-#include "robot_control/robot_control.h"
+#include "interface/robot_control.h"
+
+#include "linearizer/system_linearizer.h"
+#include "kalman/kalman_filters.h"
 
 #include <math.h>
 
@@ -28,14 +31,19 @@
 
 const char* DOF_NAMES[ DOFS_NUMBER ] = { "angle" };
 
+LinearSystem linearSystem = NULL;
+
+
+
 DECLARE_MODULE_INTERFACE( ROBOT_CONTROL_INTERFACE );
+
 
 bool InitController( const char* configurationString )
 {
   return true;
 }
 
-void EndController() { }
+void EndController() { return; }
 
 size_t GetJointsNumber() { return DOFS_NUMBER; }
 
@@ -47,11 +55,11 @@ const char** GetAxisNamesList() { return DOF_NAMES; }
 
 size_t GetExtraInputsNumber( void ) { return 0; }
       
-void SetExtraInputsList( double* inputsList ) { }
+void SetExtraInputsList( double* inputsList ) { return; }
 
 size_t GetExtraOutputsNumber( void ) { return 0; }
          
-void GetExtraOutputsList( double* outputsList ) { }
+void GetExtraOutputsList( double* outputsList ) { return; }
 
 void SetControlState( enum ControlState controlState )
 {

@@ -1,0 +1,9 @@
+[submodule "interface"]
+	path = interface
+	url = https://github.com/EESC-MKGroup/Robot-Control-Interface.git
+[submodule "linearizer"]
+	path = linearizer
+	url = https://github.com/EESC-MKGroup/System-Linearizer.git
+[submodule "kalman"]
+	path = kalman
+	url = https://github.com/EESC-MKGroup/Simple-Kalman-Filter.git
