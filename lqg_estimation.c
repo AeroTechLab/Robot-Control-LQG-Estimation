@@ -32,6 +32,7 @@
 const char* DOF_NAMES[ DOFS_NUMBER ] = { "angle" };
 
 LinearSystem linearSystem = NULL;
+KFilter observer = NULL;
 
 
 
