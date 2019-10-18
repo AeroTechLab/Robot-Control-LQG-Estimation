@@ -7,3 +7,6 @@
 [submodule "kalman"]
 	path = kalman
 	url = https://github.com/EESC-MKGroup/Simple-Kalman-Filter.git
+[submodule "lqr"]
+	path = lqr
+	url = https://github.com/EESC-MKGroup/Simple-iLQR.git
