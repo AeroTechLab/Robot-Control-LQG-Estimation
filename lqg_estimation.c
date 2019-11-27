@@ -103,6 +103,13 @@ void SetControlState( enum ControlState newControlState )
 {
   fprintf( stderr, "Setting robot control phase: %x\n", newControlState );
   
+  if( controlState == CONTROL_CALIBRATION )
+  {
+    impedancesMinList[ 0 ] = impedancesList[ 0 ];
+    impedancesMinList[ 1 ] = impedancesList[ 1 ];
+    impedancesMinList[ 2 ] = impedancesList[ 2 ];
+  }
+  
   controlState = newControlState;
   
   velocitySetpoint = 0.0;
@@ -117,6 +124,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
   axisMeasuresList[ 0 ]->position = jointMeasuresList[ 0 ]->position;
   axisMeasuresList[ 0 ]->velocity = jointMeasuresList[ 0 ]->velocity;
   axisMeasuresList[ 0 ]->acceleration = jointMeasuresList[ 0 ]->acceleration;
+  axisMeasuresList[ 0 ]->force = jointMeasuresList[ 0 ]->force;
   
   Kalman_SetTransitionFactor( observer, 0, 1, deltaTime );
   Kalman_SetTransitionFactor( observer, 0, 2, deltaTime * deltaTime / 2 );
@@ -127,44 +135,48 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
   
   if( controlState == CONTROL_OPERATION || controlState == CONTROL_CALIBRATION )
   {
-    if( controlState == CONTROL_CALIBRATION ) 
-    {
-      axisSetpointsList[ 0 ]->position = sin( samplingTime );
-      
-      totalForceSetpoint = -positionProportionalGain * measuresList[ 0 ];
-    }
-    else
-    {
-      
-    }
-    
-    inputsList[ 0 ] = axisMeasuresList[ 0 ]->force + totalForceSetpoint;
-    Kalman_Predict( observer, inputsList, statesList );
-    measuresList[ 0 ] = axisMeasuresList[ 0 ]->position - axisSetpointsList[ 0 ]->position;
-    Kalman_Update( observer, measuresList, statesList );
-    ILQR_CalculateFeedback( regulator, statesList, feedbacksList );
+    double positionError = axisSetpointsList[ 0 ]->position - axisMeasuresList[ 0 ]->position;
+    statesList[ 0 ] = positionError;
     statesList[ 1 ] = axisMeasuresList[ 0 ]->velocity;
     statesList[ 2 ] = axisMeasuresList[ 0 ]->acceleration;
     inputsList[ 0 ] = axisSetpointsList[ 0 ]->force;
     SystemLinearizer_AddSample( linearSystem, statesList, inputsList );
-    if( SystemLinearizer_Identify( linearSystem, impedancesList ) )
+    SystemLinearizer_Identify( linearSystem, impedancesList );
+    
+    if( controlState == CONTROL_CALIBRATION ) 
+    {
+      axisSetpointsList[ 0 ]->position = sin( samplingTime );
+      
+      impedancesList[ 0 ] = fmax( 0.0, impedancesList[ 0 ] );
+      impedancesList[ 1 ] = fmax( 0.0, impedancesList[ 1 ] );
+      impedancesList[ 2 ] = fmax( 0.0, impedancesList[ 2 ] );
+      
+      totalForceSetpoint = -positionProportionalGain * positionError;
+    }
+    else
     {
       impedancesList[ 2 ] = fmax( axisMeasuresList[ 0 ]->inertia, impedancesMinList[ 2 ] );
       impedancesList[ 1 ] = fmax( axisMeasuresList[ 0 ]->damping, impedancesMinList[ 1 ] );
+      impedancesList[ 0 ] = fmax( axisMeasuresList[ 0 ]->stiffness, impedancesMinList[ 0 ] );
       Kalman_SetTransitionFactor( observer, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
       ILQR_SetTransitionFactor( regulator, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
       Kalman_SetInputFactor( observer, 2, 0, 1.0 / impedancesList[ 2 ] );
       ILQR_SetInputFactor( regulator, 2, 0, 1.0 / impedancesList[ 2 ] );
+      
+      axisMeasuresList[ 0 ]->force = impedancesList[ 0 ] * positionError;
+      inputsList[ 0 ] = axisMeasuresList[ 0 ]->force + totalForceSetpoint;
+      Kalman_Predict( observer, inputsList, statesList );
+      measuresList[ 0 ] = -positionError;
+      Kalman_Update( observer, measuresList, statesList );
+      ILQR_CalculateFeedback( regulator, statesList, feedbacksList );
+      
+      totalForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ 0 ]->force;
     }
-  
-    if( controlState == CONTROL_OPERATION ) totalForceSetpoint = -feedbacksList[ 0 ] + inputsList[ 0 ];
-    else if( controlState == CONTROL_CALIBRATION ) 
     
-    double forceError = totalForceSetpoint - axisMeasuresList[ 0 ]->force;
+    double forceError = -jointMeasuresList[ 0 ]->force;//totalForceSetpoint - axisMeasuresList[ 0 ]->force;
     velocitySetpoint += forceProportionalGain * ( forceError - lastForceError ) + forceIntegralGain * deltaTime * forceError;
     lastForceError = forceError;
     
-    axisMeasuresList[ 0 ]->force = -impedancesList[ 0 ] * measuresList[ 0 ];
     axisMeasuresList[ 0 ]->stiffness = impedancesList[ 0 ];
     axisMeasuresList[ 0 ]->damping = impedancesList[ 1 ];
     axisMeasuresList[ 0 ]->inertia = impedancesList[ 2 ];
