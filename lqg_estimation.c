@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//  Copyright (c) 2019 Leonardo Consoni <consoni_2519@hotmail.com>             //
+//  Copyright (c) 2019-2020 Leonardo Consoni <leonardojc@protonmail.com>       //
 //                                                                             //
 //  This file is part of Robot-Control-LQG-Estimation.                         //
 //                                                                             //
