@@ -126,9 +126,9 @@ void SetControlState( enum ControlState newControlState )
   
     if( controlState == CONTROL_CALIBRATION )
     {
-      dof->impedancesMinList[ 0 ] = dof->impedancesList[ 0 ];
-      dof->impedancesMinList[ 1 ] = dof->impedancesList[ 1 ];
-      dof->impedancesMinList[ 2 ] = dof->impedancesList[ 2 ];
+      dof->impedancesMinList[ 0 ] = 0.0;
+      dof->impedancesMinList[ 1 ] = 0.0;
+      dof->impedancesMinList[ 2 ] = 0.0;
     }
     
     dof->velocitySetpoint = 0.0;
@@ -151,6 +151,9 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     axisMeasuresList[ dofIndex ]->velocity = jointMeasuresList[ dofIndex ]->velocity;
     axisMeasuresList[ dofIndex ]->acceleration = jointMeasuresList[ dofIndex ]->acceleration;
     axisMeasuresList[ dofIndex ]->force = jointMeasuresList[ dofIndex ]->force;
+    axisMeasuresList[ dofIndex ]->stiffness = jointMeasuresList[ dofIndex ]->stiffness;
+    axisMeasuresList[ dofIndex ]->damping = jointMeasuresList[ dofIndex ]->damping;
+    axisMeasuresList[ dofIndex ]->inertia = jointMeasuresList[ dofIndex ]->inertia;
     
     Kalman_SetTransitionFactor( dof->observer, 0, 1, deltaTime );
     Kalman_SetTransitionFactor( dof->observer, 0, 2, deltaTime * deltaTime / 2 );
@@ -161,29 +164,32 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     
     if( controlState == CONTROL_OPERATION || controlState == CONTROL_CALIBRATION )
     {
+      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( samplingTime ) / 2;
+      
       double positionError = axisSetpointsList[ dofIndex ]->position - axisMeasuresList[ dofIndex ]->position;
       dof->statesList[ 0 ] = positionError;
       dof->statesList[ 1 ] = axisMeasuresList[ dofIndex ]->velocity;
       dof->statesList[ 2 ] = axisMeasuresList[ dofIndex ]->acceleration;
-      dof->inputsList[ 0 ] = axisSetpointsList[ dofIndex ]->force;
+      dof->inputsList[ 0 ] = dof->totalForceSetpoint;
       SystemLinearizer_AddSample( dof->linearSystem, dof->statesList, dof->inputsList );
       SystemLinearizer_Identify( dof->linearSystem, dof->impedancesList );
-      
+       
       if( controlState == CONTROL_CALIBRATION ) 
-      {
-        axisSetpointsList[ 0 ]->position = sin( samplingTime );
-        
+      {       
         dof->impedancesList[ 0 ] = fmax( 0.0, dof->impedancesList[ 0 ] );
         dof->impedancesList[ 1 ] = fmax( 0.0, dof->impedancesList[ 1 ] );
         dof->impedancesList[ 2 ] = fmax( 0.0, dof->impedancesList[ 2 ] );
+        dof->impedancesMinList[ 0 ] = ( dof->impedancesList[ 0 ] + dof->impedancesMinList[ 0 ] ) / 2;
+        dof->impedancesMinList[ 1 ] = ( dof->impedancesList[ 1 ] + dof->impedancesMinList[ 1 ] ) / 2;
+        dof->impedancesMinList[ 2 ] = ( dof->impedancesList[ 2 ] + dof->impedancesMinList[ 2 ] ) / 2;
         
-        dof->totalForceSetpoint = -positionProportionalGain * positionError;
+        dof->totalForceSetpoint = positionProportionalGain * positionError;
       }
       else
       {
-        dof->impedancesList[ 2 ] = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->impedancesMinList[ 2 ] );
-        dof->impedancesList[ 1 ] = fmax( axisMeasuresList[ dofIndex ]->damping, dof->impedancesMinList[ 1 ] );
-        dof->impedancesList[ 0 ] = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->impedancesMinList[ 0 ] );
+        dof->impedancesList[ 2 ] = fmax( dof->impedancesList[ 2 ], dof->impedancesMinList[ 2 ] );
+        dof->impedancesList[ 1 ] = fmax( dof->impedancesList[ 1 ], dof->impedancesMinList[ 1 ] );
+        dof->impedancesList[ 0 ] = fmax( dof->impedancesList[ 0 ], dof->impedancesMinList[ 0 ] );
         Kalman_SetTransitionFactor( dof->observer, 2, 1, -dof->impedancesList[ 1 ] / dof->impedancesList[ 2 ] );
         ILQR_SetTransitionFactor( dof->regulator, 2, 1, -dof->impedancesList[ 1 ] / dof->impedancesList[ 2 ] );
         Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / dof->impedancesList[ 2 ] );
@@ -196,10 +202,10 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         Kalman_Update( dof->observer, dof->measuresList, dof->statesList );
         ILQR_CalculateFeedback( dof->regulator, dof->statesList, dof->feedbacksList );
         
-        dof->totalForceSetpoint = -dof->feedbacksList[ 0 ] + axisSetpointsList[ 0 ]->force;
+        dof->totalForceSetpoint = 0.0;//-dof->feedbacksList[ 0 ] + axisSetpointsList[ 0 ]->force;
       }
       
-      double forceError = -jointMeasuresList[ 0 ]->force;//totalForceSetpoint - axisMeasuresList[ 0 ]->force;
+      double forceError = dof->totalForceSetpoint - axisMeasuresList[ 0 ]->force;
       dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
       dof->lastForceError = forceError;
       
