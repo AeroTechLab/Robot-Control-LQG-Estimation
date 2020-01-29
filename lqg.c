@@ -39,19 +39,20 @@ double samplingTime = 0.0;
 double positionProportionalGain = 0.0;
 double forceProportionalGain = 0.0, forceIntegralGain = 0.0;
 
+double inputsList[ 1 ] = { 0 };
+double measuresList[ 1 ] = { 0 };
+double statesList[ 3 ] = { 0 };
+double impedancesList[ 3 ] = { 0 };
+double feedbacksList[ 1 ] = { 0 };
+
 typedef struct DoFData
 {
   KFilter observer;
   ILQRegulator regulator;
 
-  double inputsList[ 1 ];
-  double measuresList[ 1 ];
-  double statesList[ 3 ];
-  double impedancesList[ 3 ];
   double impedancesMinList[ 3 ];
-  double feedbacksList[ 1 ];
-
-  double totalForceSetpoint;
+  
+  double actuatorForceSetpoint;
   double velocitySetpoint;
   double lastForceError;
 }
@@ -131,6 +132,7 @@ void SetControlState( enum ControlState newControlState )
     }
     
     dof->velocitySetpoint = 0.0;
+    dof->actuatorForceSetpoint = 0.0;
     
     Kalman_Reset( dof->observer );
   }
@@ -160,43 +162,43 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     ILQR_SetTransitionFactor( dof->regulator, 0, 1, deltaTime );
     ILQR_SetTransitionFactor( dof->regulator, 0, 2, deltaTime * deltaTime / 2 );
     ILQR_SetTransitionFactor( dof->regulator, 1, 2, deltaTime );
-  
+    
     if( controlState == CONTROL_OPERATION || controlState == CONTROL_CALIBRATION )
     {    
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( samplingTime ) / 2;
       // u = f_r + f_ext
-      dof->inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->totalForceSetpoint;
-      dof->measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
+      inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
+      measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
+      feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
         dof->impedancesMinList[ 0 ] = ( axisMeasuresList[ dofIndex ]->inertia + dof->impedancesMinList[ 0 ] ) / 2;
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
-        
-        dof->totalForceSetpoint = -positionProportionalGain * dof->measuresList[ 0 ];
       }
       else
       {
-        axisMeasuresList[ dofIndex ]->inertia = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->impedancesMinList[ 2 ] );
-        axisMeasuresList[ dofIndex ]->damping = fmax( axisMeasuresList[ dofIndex ]->damping, dof->impedancesMinList[ 1 ] );
-        axisMeasuresList[ dofIndex ]->stiffness = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->impedancesMinList[ 0 ] );
-        Kalman_SetTransitionFactor( dof->observer, 2, 0, -dof->impedancesList[ 0 ] / dof->impedancesList[ 2 ] );
-        ILQR_SetTransitionFactor( dof->regulator, 2, 0, -dof->impedancesList[ 0 ] / dof->impedancesList[ 2 ] );
-        Kalman_SetTransitionFactor( dof->observer, 2, 1, -dof->impedancesList[ 1 ] / dof->impedancesList[ 2 ] );
-        ILQR_SetTransitionFactor( dof->regulator, 2, 1, -dof->impedancesList[ 1 ] / dof->impedancesList[ 2 ] );
-        Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / dof->impedancesList[ 2 ] );
-        ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / dof->impedancesList[ 2 ] );
+        impedancesList[ 2 ] = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->impedancesMinList[ 2 ] );
+        impedancesList[ 1 ] = fmax( axisMeasuresList[ dofIndex ]->damping, dof->impedancesMinList[ 1 ] );
+        impedancesList[ 0 ] = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->impedancesMinList[ 0 ] );
+        
+        Kalman_SetTransitionFactor( dof->observer, 2, 0, -impedancesList[ 0 ] / impedancesList[ 2 ] );
+        ILQR_SetTransitionFactor( dof->regulator, 2, 0, -impedancesList[ 0 ] / impedancesList[ 2 ] );
+        Kalman_SetTransitionFactor( dof->observer, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
+        ILQR_SetTransitionFactor( dof->regulator, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
+        Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / impedancesList[ 2 ] );
+        ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / impedancesList[ 2 ] );
         // z = Az + Bu + K( y - r - C( Az + Bu ) )
-        Kalman_Predict( dof->observer, dof->inputsList, dof->statesList );
-        Kalman_Update( dof->observer, dof->measuresList, dof->statesList );
+        Kalman_Predict( dof->observer, inputsList, statesList );
+        Kalman_Update( dof->observer, measuresList, statesList );
         // f_lqg = -Gz
-        ILQR_CalculateFeedback( dof->regulator, dof->statesList, dof->feedbacksList );
-        // f_r = f_lqg + f_set
-        dof->totalForceSetpoint = 0.0;//-dof->feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
+        ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
       } 
+      // f_r = f_lqg + f_set
+      dof->actuatorForceSetpoint = 0.0;//-feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // Force-velocity PI control (SEA)
-      double forceError = dof->totalForceSetpoint - axisMeasuresList[ dofIndex ]->force;
+      double forceError = dof->actuatorForceSetpoint - axisMeasuresList[ dofIndex ]->force;
       dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
       dof->lastForceError = forceError;
     }
@@ -206,7 +208,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     jointSetpointsList[ dofIndex ]->position = axisSetpointsList[ dofIndex ]->position;
     jointSetpointsList[ dofIndex ]->velocity = axisSetpointsList[ dofIndex ]->velocity;
     jointSetpointsList[ dofIndex ]->acceleration = axisSetpointsList[ dofIndex ]->acceleration;
-    jointSetpointsList[ dofIndex ]->force = dof->totalForceSetpoint;
+    jointSetpointsList[ dofIndex ]->force = dof->actuatorForceSetpoint;
   }
   
   fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
