@@ -29,11 +29,11 @@
 #include <math.h>
 #include <string.h>
 
-#define DOFS_NUMBER 2
+#define DOFS_NUMBER_MAX 6
 
 enum ControlState controlState = CONTROL_PASSIVE;
 
-const char* DOF_NAMES[ DOFS_NUMBER ] = { "angle1", "angle2" };
+const char* DOF_NAMES[ DOFS_NUMBER_MAX ] = { "angle1", "angle2", "angle3", "angle4", "angle5", "angle6" };
 
 double samplingTime = 0.0;
 
@@ -59,7 +59,8 @@ typedef struct DoFData
 }
 DoFData;
 
-DoFData dofsList[ DOFS_NUMBER ];
+DoFData dofsList[ DOFS_NUMBER_MAX ];
+size_t dofsNumber = 0;
 
 
 DECLARE_MODULE_INTERFACE( ROBOT_CONTROL_INTERFACE );
@@ -67,11 +68,13 @@ DECLARE_MODULE_INTERFACE( ROBOT_CONTROL_INTERFACE );
 
 bool InitController( const char* configurationString )
 {
-  positionProportionalGain = strtod( strtok( (char*) configurationString, " " ), NULL );
+  dofsNumber = strtoul( strtok( (char*) configurationString, " " ), NULL, 0 );
+  if( dofsNumber > DOFS_NUMBER_MAX ) dofsNumber = DOFS_NUMBER_MAX;
+  positionProportionalGain = strtod( strtok( NULL, " " ), NULL );
   forceProportionalGain = strtod( strtok( NULL, " " ), NULL );
   forceIntegralGain = strtod( strtok( NULL, " " ), NULL );
   
-  for( size_t dofIndex = 0; dofIndex < DOFS_NUMBER; dofIndex++ )
+  for( size_t dofIndex = 0; dofIndex < dofsNumber; dofIndex++ )
   {
     DoFData* dof = &(dofsList[ dofIndex ]);
     
@@ -88,7 +91,7 @@ bool InitController( const char* configurationString )
 
 void EndController() 
 { 
-  for( size_t dofIndex = 0; dofIndex < DOFS_NUMBER; dofIndex++ )
+  for( size_t dofIndex = 0; dofIndex < dofsNumber; dofIndex++ )
   {
     DoFData* dof = &(dofsList[ dofIndex ]);
     
@@ -100,11 +103,11 @@ void EndController()
   return; 
 }
 
-size_t GetJointsNumber() { return DOFS_NUMBER; }
+size_t GetJointsNumber() { return dofsNumber; }
 
 const char** GetJointNamesList() { return DOF_NAMES; }
 
-size_t GetAxesNumber() { return DOFS_NUMBER; }
+size_t GetAxesNumber() { return dofsNumber; }
 
 const char** GetAxisNamesList() { return DOF_NAMES; }
 
@@ -120,7 +123,7 @@ void SetControlState( enum ControlState newControlState )
 {
   fprintf( stderr, "Setting robot control phase: %x\n", newControlState );
   
-  for( size_t dofIndex = 0; dofIndex < DOFS_NUMBER; dofIndex++ )
+  for( size_t dofIndex = 0; dofIndex < dofsNumber; dofIndex++ )
   {
     DoFData* dof = &(dofsList[ dofIndex ]);
   
@@ -143,7 +146,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
 {
   samplingTime += deltaTime;
   
-  for( size_t dofIndex = 0; dofIndex < DOFS_NUMBER; dofIndex++ )
+  for( size_t dofIndex = 0; dofIndex < dofsNumber; dofIndex++ )
   {
     DoFData* dof = &(dofsList[ dofIndex ]);
   
