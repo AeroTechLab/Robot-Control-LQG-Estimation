@@ -45,6 +45,8 @@ double statesList[ 3 ] = { 0 };
 double impedancesList[ 3 ] = { 0 };
 double feedbacksList[ 1 ] = { 0 };
 
+bool isCalibrated = false;
+
 typedef struct DoFData
 {
   KFilter observer;
@@ -124,7 +126,7 @@ void SetControlState( enum ControlState newControlState )
   {
     DoFData* dof = &(dofsList[ dofIndex ]);
   
-    if( controlState == CONTROL_CALIBRATION )
+    if( newControlState == CONTROL_CALIBRATION )
     {
       dof->impedancesMinList[ 0 ] = 0.0;
       dof->impedancesMinList[ 1 ] = 0.0;
@@ -136,6 +138,9 @@ void SetControlState( enum ControlState newControlState )
     
     Kalman_Reset( dof->observer );
   }
+  
+  if( newControlState == CONTROL_CALIBRATION ) isCalibrated = false;
+  else if( controlState == CONTROL_CALIBRATION ) isCalibrated = true;
   
   controlState = newControlState;
 }
@@ -179,7 +184,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         
         feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       }
-      else
+      else if( isCalibrated )
       {
         impedancesList[ 2 ] = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->impedancesMinList[ 2 ] );
         impedancesList[ 1 ] = fmax( axisMeasuresList[ dofIndex ]->damping, dof->impedancesMinList[ 1 ] );
