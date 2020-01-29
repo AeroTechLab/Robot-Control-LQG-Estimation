@@ -69,7 +69,6 @@ bool InitController( const char* configurationString )
   dofsNumber = strtoul( strtok( (char*) configurationString, " " ), NULL, 0 );
   if( dofsNumber > DOFS_NUMBER_MAX ) dofsNumber = DOFS_NUMBER_MAX;
   positionProportionalGain = strtod( strtok( NULL, " " ), NULL );
-  positionProportionalGain = strtod( strtok( (char*) configurationString, " " ), NULL );
   forceProportionalGain = strtod( strtok( NULL, " " ), NULL );
   forceIntegralGain = strtod( strtok( NULL, " " ), NULL );
   
