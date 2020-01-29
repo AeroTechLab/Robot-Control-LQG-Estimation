@@ -200,7 +200,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         Kalman_Predict( dof->observer, inputsList, statesList );
         Kalman_Update( dof->observer, measuresList, statesList );
         // f_lqg = -Gz
-        ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
+        //ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
       } 
       // f_r = f_lqg + f_set
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ];// + axisSetpointsList[ dofIndex ]->force;
@@ -218,9 +218,9 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     jointSetpointsList[ dofIndex ]->force = dof->actuatorForceSetpoint;
   }
   
-  fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
-                                                                                          axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
-                                                                                          axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
-                                                                                          axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
+//   fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
+//                                                                                           axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
+//                                                                                           axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
+//                                                                                           axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
 }
 
