@@ -170,7 +170,6 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     
     if( controlState != CONTROL_OFFSET )
     {    
-      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( samplingTime ) / 2;
       // u = f_r + f_ext
       inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
@@ -182,7 +181,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
         
-        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
+        feedbacksList[ 0 ] = sin( 2 * M_PI * samplingTime / 4 ); //positionProportionalGain * measuresList[ 0 ];
       }
       else if( isCalibrated )
       {
@@ -203,7 +202,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         //ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
       } 
       // f_r = f_lqg + f_set
-      dof->actuatorForceSetpoint = -feedbacksList[ 0 ];// + axisSetpointsList[ dofIndex ]->force;
+      dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // Force-velocity PI control (SEA)
       double forceError = dof->actuatorForceSetpoint - axisMeasuresList[ dofIndex ]->force;
       dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
