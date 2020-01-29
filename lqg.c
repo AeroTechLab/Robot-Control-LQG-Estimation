@@ -163,19 +163,21 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     ILQR_SetTransitionFactor( dof->regulator, 0, 2, deltaTime * deltaTime / 2 );
     ILQR_SetTransitionFactor( dof->regulator, 1, 2, deltaTime );
     
-    if( controlState == CONTROL_OPERATION || controlState == CONTROL_CALIBRATION )
+    if( controlState != CONTROL_OFFSET )
     {    
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( samplingTime ) / 2;
       // u = f_r + f_ext
       inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
+      feedbacksList[ 0 ] = 0.0;
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
         dof->impedancesMinList[ 0 ] = ( axisMeasuresList[ dofIndex ]->inertia + dof->impedancesMinList[ 0 ] ) / 2;
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
+        
+        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       }
       else
       {
