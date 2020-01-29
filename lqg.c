@@ -170,6 +170,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     
     if( controlState != CONTROL_OFFSET )
     {    
+      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
       // u = f_r + f_ext
       inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
@@ -181,7 +182,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
         
-        feedbacksList[ 0 ] = sin( 2 * M_PI * samplingTime / 4 ); //positionProportionalGain * measuresList[ 0 ];
+        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       }
       else if( isCalibrated )
       {
