@@ -198,7 +198,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
       } 
       // f_r = f_lqg + f_set
-      dof->actuatorForceSetpoint = 0.0;//-feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
+      dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // Force-velocity PI control (SEA)
       double forceError = dof->actuatorForceSetpoint - axisMeasuresList[ dofIndex ]->force;
       dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
