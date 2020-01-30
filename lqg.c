@@ -181,7 +181,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
         
-        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
+        feedbacksList[ 0 ] = sin( 2 * M_PI * samplingTime / 4 ) / 2;//positionProportionalGain * measuresList[ 0 ];
       }
       else if( controlState == CONTROL_OPERATION && isCalibrated )
       {
