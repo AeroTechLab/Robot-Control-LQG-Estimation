@@ -173,7 +173,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
       // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = -axisMeasuresList[ 0 ]->force / 100;
+      feedbacksList[ 0 ] = -axisMeasuresList[ 0 ]->force / 10;
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
@@ -219,9 +219,9 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     jointSetpointsList[ dofIndex ]->force = dof->actuatorForceSetpoint;
   }
   
-//   fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
-//                                                                                           axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
-//                                                                                           axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
-//                                                                                           axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
+  fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
+                                                                                          axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
+                                                                                          axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
+                                                                                          axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
 }
 
