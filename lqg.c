@@ -212,16 +212,15 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     }
     
     axisSetpointsList[ dofIndex ]->velocity = dof->velocitySetpoint;
-    axisSetpointsList[ dofIndex ]->force = dof->actuatorForceSetpoint;
     
     jointSetpointsList[ dofIndex ]->position = axisSetpointsList[ dofIndex ]->position;
     jointSetpointsList[ dofIndex ]->velocity = axisSetpointsList[ dofIndex ]->velocity;
     jointSetpointsList[ dofIndex ]->acceleration = axisSetpointsList[ dofIndex ]->acceleration;
-    jointSetpointsList[ dofIndex ]->force = axisSetpointsList[ dofIndex ]->force;
+    jointSetpointsList[ dofIndex ]->force = dof->actuatorForceSetpoint;
   }
   
   fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
-                                                                                          axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
+                                                                                          jointSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
                                                                                           axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
                                                                                           axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
 }
