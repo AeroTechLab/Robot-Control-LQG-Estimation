@@ -173,7 +173,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
       // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = -axisMeasuresList[ 0 ]->force;
+      feedbacksList[ 0 ] = 0.0;//-axisMeasuresList[ 0 ]->force;
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
@@ -202,6 +202,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         Kalman_Update( dof->observer, measuresList, statesList );
         // f_lqg = -Gz
         ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
+        feedbacksList[ 0 ] = 0.0;
       } 
       // f_r = f_lqg + f_set
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
