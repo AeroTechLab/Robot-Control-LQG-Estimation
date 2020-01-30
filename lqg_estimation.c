@@ -228,6 +228,10 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       actuatorForceSetpoint = axisMeasuresList[ dofIndex ]->inertia * axisMeasuresList[ dofIndex ]->acceleration
                               + axisMeasuresList[ dofIndex ]->damping * axisMeasuresList[ dofIndex ]->velocity
                               + interactionForceSetpoint;
+      // Force-velocity PI control (SEA)
+      //double forceError = -interactionForceSetpoint - axisMeasuresList[ dofIndex ]->force;
+      //dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
+      //dof->lastForceError = forceError;
       
       axisMeasuresList[ dofIndex ]->stiffness = loadImpedancesList[ 0 ];
       axisMeasuresList[ dofIndex ]->damping = loadImpedancesList[ 1 ];
