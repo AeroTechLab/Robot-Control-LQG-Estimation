@@ -171,10 +171,9 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     if( controlState != CONTROL_OFFSET )
     {    
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
-      // u = f_r + f_ext
-      inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
+      // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = 0.0;
+      feedbacksList[ 0 ] = -axisMeasuresList[ 0 ]->force / 100;
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
@@ -184,23 +183,25 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         
         feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       }
-      else if( isCalibrated )
+      else if( controlState == CONTROL_OPERATION && isCalibrated )
       {
         impedancesList[ 2 ] = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->impedancesMinList[ 2 ] );
         impedancesList[ 1 ] = fmax( axisMeasuresList[ dofIndex ]->damping, dof->impedancesMinList[ 1 ] );
         impedancesList[ 0 ] = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->impedancesMinList[ 0 ] );
-        
+        // ddot(x) = u * 1/M_r - D_r/M_r * dot(x) - K_r * x
         Kalman_SetTransitionFactor( dof->observer, 2, 0, -impedancesList[ 0 ] / impedancesList[ 2 ] );
         ILQR_SetTransitionFactor( dof->regulator, 2, 0, -impedancesList[ 0 ] / impedancesList[ 2 ] );
         Kalman_SetTransitionFactor( dof->observer, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
         ILQR_SetTransitionFactor( dof->regulator, 2, 1, -impedancesList[ 1 ] / impedancesList[ 2 ] );
         Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / impedancesList[ 2 ] );
         ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / impedancesList[ 2 ] );
-        // z = Az + Bu + K( y - r - C( Az + Bu ) )
+        // u = f_ext + f_r
+        inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
+        // z = Az + Bu + K( x - x^d - C( Az + Bu ) )
         Kalman_Predict( dof->observer, inputsList, statesList );
         Kalman_Update( dof->observer, measuresList, statesList );
         // f_lqg = -Gz
-        //ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
+        ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
       } 
       // f_r = f_lqg + f_set
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
