@@ -145,6 +145,8 @@ void SetControlState( enum ControlState newControlState )
     Kalman_Reset( dof->observer );
   }
   
+  samplingTime = 0.0;
+  
   controlState = newControlState;
 }
 
@@ -176,10 +178,9 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     
     if( controlState != CONTROL_OFFSET )
     {
-      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
       // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
+      feedbacksList[ 0 ] = 0.0;
       
       axisMeasuresList[ dofIndex ]->stiffness = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->actuatorImpedancesMinList[ 0 ] );
       axisMeasuresList[ dofIndex ]->damping = fmax( axisMeasuresList[ dofIndex ]->damping, dof->actuatorImpedancesMinList[ 1 ] );
@@ -243,6 +244,8 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       axisMeasuresList[ dofIndex ]->inertia = loadImpedancesList[ 2 ];
     }
     
+    axisSetpointsList[ dofIndex ]->velocity = dof->velocitySetpoint;
+    
     jointSetpointsList[ dofIndex ]->position = axisSetpointsList[ dofIndex ]->position;
     jointSetpointsList[ dofIndex ]->velocity = axisSetpointsList[ dofIndex ]->velocity;
     jointSetpointsList[ dofIndex ]->acceleration = axisSetpointsList[ dofIndex ]->acceleration;
@@ -250,7 +253,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
   }
   
   fprintf( stderr, "pd=%.3f, p=%.3f, fd=%.3f, f=%.3f, i=%.3f, d=%.3f, s=%.3f, vd=%.3f\n", axisSetpointsList[ 0 ]->position, axisMeasuresList[ 0 ]->position,
-                                                                                          axisSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
+                                                                                          jointSetpointsList[ 0 ]->force, axisMeasuresList[ 0 ]->force, 
                                                                                           axisMeasuresList[ 0 ]->inertia, axisMeasuresList[ 0 ]->damping, 
                                                                                           axisMeasuresList[ 0 ]->stiffness, axisSetpointsList[ 0 ]->velocity );
 }
