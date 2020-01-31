@@ -209,7 +209,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       // f_r = f_lqg + f_set
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // f_ext + f_r = D_r' * dot(x) -> dox(x)^d = ( f_ext + f_r ) / D_r'
-      double equivalentDamping = ( axisMeasuresList[ 0 ]->damping > 0.0 ) ? axisMeasuresList[ 0 ]->damping : 10.0;
+      double equivalentDamping = ( axisMeasuresList[ 0 ]->damping > 0.0 ) ? axisMeasuresList[ 0 ]->damping : 100.0;
       dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
     }
     
