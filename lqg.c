@@ -204,7 +204,6 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         Kalman_Update( dof->observer, measuresList, statesList );
         // f_lqg = -Gz
         ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
-        feedbacksList[ 0 ] = 0.0;
       } 
       // f_r = f_lqg + f_set
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
