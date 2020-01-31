@@ -170,10 +170,10 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
     
     if( controlState != CONTROL_OFFSET )
     {    
-      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
+      if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 16 ) / 2;
       // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = 0.0;//-axisMeasuresList[ 0 ]->force;
+      feedbacksList[ 0 ] = 0.0;
       
       if( controlState == CONTROL_CALIBRATION ) 
       {        
@@ -181,7 +181,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         dof->impedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->impedancesMinList[ 1 ] ) / 2;
         dof->impedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->impedancesMinList[ 2 ] ) / 2;
         
-        feedbacksList[ 0 ] = sin( 2 * M_PI * samplingTime / 4 ) / 2;//positionProportionalGain * measuresList[ 0 ];
+        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       }
       else if( controlState == CONTROL_OPERATION && isCalibrated )
       {
@@ -208,8 +208,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // f_ext + f_r = D_r' * dot(x) -> dox(x)^d = ( f_ext + f_r ) / D_r'
       double equivalentDamping = ( axisMeasuresList[ 0 ]->damping > 0.0 ) ? axisMeasuresList[ 0 ]->damping : 10.0;
-      //dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
-      dof->velocitySetpoint = dof->actuatorForceSetpoint / equivalentDamping;
+      dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
     }
     
     axisSetpointsList[ dofIndex ]->velocity = dof->velocitySetpoint;
