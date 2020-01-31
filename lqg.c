@@ -198,7 +198,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
         Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / impedancesList[ 2 ] );
         ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / impedancesList[ 2 ] );
         // u = f_ext + f_r
-        inputsList[ 0 ] = -axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
+        inputsList[ 0 ] = axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint;
         // z = Az + Bu + K( x - x^d - C( Az + Bu ) )
         Kalman_Predict( dof->observer, inputsList, statesList );
         Kalman_Update( dof->observer, measuresList, statesList );
@@ -210,7 +210,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // f_ext + f_r = D_r' * dot(x) -> dox(x)^d = ( f_ext + f_r ) / D_r'
       double equivalentDamping = ( axisMeasuresList[ 0 ]->damping > 0.0 ) ? axisMeasuresList[ 0 ]->damping : 10.0;
-      dof->velocitySetpoint = ( -axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
+      dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
     }
     
     axisSetpointsList[ dofIndex ]->velocity = dof->velocitySetpoint;
