@@ -130,7 +130,7 @@ void SetControlState( enum ControlState newControlState )
     {
       dof->impedancesMinList[ 0 ] = 0.0;
       dof->impedancesMinList[ 1 ] = 0.0;
-      dof->impedancesMinList[ 2 ] = 0.0;
+      dof->impedancesMinList[ 2 ] = 0.1;
     }
     
     dof->velocitySetpoint = 0.0;
@@ -210,7 +210,7 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       dof->actuatorForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ dofIndex ]->force;
       // f_ext + f_r = D_r' * dot(x) -> dox(x)^d = ( f_ext + f_r ) / D_r'
       double equivalentDamping = ( axisMeasuresList[ 0 ]->damping > 0.0 ) ? axisMeasuresList[ 0 ]->damping : 100.0;
-      dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint ) / equivalentDamping;
+      dof->velocitySetpoint = ( axisMeasuresList[ dofIndex ]->force + dof->actuatorForceSetpoint - axisMeasuresList[ 0 ]->inertia * axisMeasuresList[ 0 ]->acceleration ) / equivalentDamping;
     }
     
     axisSetpointsList[ dofIndex ]->velocity = dof->velocitySetpoint;
