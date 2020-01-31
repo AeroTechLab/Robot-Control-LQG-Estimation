@@ -37,9 +37,8 @@ const char* DOF_NAMES[ DOFS_NUMBER_MAX ] = { "angle1", "angle2", "angle3", "angl
 
 double samplingTime = 0.0;
 
-bool identificationEnabled = false;
-
 double positionProportionalGain = 0.0;
+double forceProportionalGain = 0.0, forceIntegralGain = 0.0;
 double interactionForceSetpoint = 0.0;
 
 double inputsList[ 1 ] = { 0 };
@@ -56,6 +55,9 @@ typedef struct DoFData
 
   double loadImpedancesMinList[ 3 ];
   double actuatorImpedancesMinList[ 3 ];
+  
+  double velocitySetpoint;
+  double lastForceError;
 }
 DoFData;
 
@@ -71,7 +73,8 @@ bool InitController( const char* configurationString )
   dofsNumber = strtoul( strtok( (char*) configurationString, " " ), NULL, 0 );
   if( dofsNumber > DOFS_NUMBER_MAX ) dofsNumber = DOFS_NUMBER_MAX;
   positionProportionalGain = strtod( strtok( NULL, " " ), NULL );
-  identificationEnabled = ( strcmp( strtok( NULL, " " ), "id_on" ) == 0 ) ? true : false;
+  forceProportionalGain = strtod( strtok( NULL, " " ), NULL );
+  forceIntegralGain = strtod( strtok( NULL, " " ), NULL );
   
   for( size_t dofIndex = 0; dofIndex < dofsNumber; dofIndex++ )
   {
@@ -136,6 +139,9 @@ void SetControlState( enum ControlState newControlState )
       dof->loadImpedancesMinList[ 2 ] = 0.1;
     }
     
+    dof->velocitySetpoint = 0.0;
+    dof->lastForceError = 0.0;
+    
     Kalman_Reset( dof->observer );
   }
   
@@ -173,65 +179,64 @@ void RunControlStep( DoFVariables** jointMeasuresList, DoFVariables** axisMeasur
       if( controlState == CONTROL_CALIBRATION ) axisSetpointsList[ 0 ]->position = sin( 2 * M_PI * samplingTime / 4 ) / 2;
       // e = x - x^d = x_h - x^d = x_r = x^d
       measuresList[ 0 ] = axisMeasuresList[ dofIndex ]->position - axisSetpointsList[ dofIndex ]->position;
-      feedbacksList[ 0 ] = ( controlState != CONTROL_PASSIVE ) ? positionProportionalGain * measuresList[ 0 ] : 0.0;
+      feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
       
       axisMeasuresList[ dofIndex ]->stiffness = fmax( axisMeasuresList[ dofIndex ]->stiffness, dof->actuatorImpedancesMinList[ 0 ] );
       axisMeasuresList[ dofIndex ]->damping = fmax( axisMeasuresList[ dofIndex ]->damping, dof->actuatorImpedancesMinList[ 1 ] );
       axisMeasuresList[ dofIndex ]->inertia = fmax( axisMeasuresList[ dofIndex ]->inertia, dof->actuatorImpedancesMinList[ 2 ] );
       
-      if( identificationEnabled )
-      {
-        // -f_int = K_h * ( x^d - x ) + D_h * dot(x) + M_h * ddot(x)
-        statesList[ 0 ] = -measuresList[ 0 ];
-        statesList[ 1 ] = axisMeasuresList[ dofIndex ]->velocity;
-        statesList[ 2 ] = axisMeasuresList[ dofIndex ]->acceleration;
-        inputsList[ 0 ] = -axisMeasuresList[ 0 ]->force;
-        if( SystemLinearizer_AddSample(  dof->linearSystem, inputsList, statesList ) >= LINEARIZATION_MAX_SAMPLES )
-          SystemLinearizer_Identify( dof->linearSystem, loadImpedancesList );
+      // f_int = K_h * (-e) + D_h * dot(x) + M_h * ddot(x)
+      statesList[ 0 ] = -measuresList[ 0 ];
+      statesList[ 1 ] = axisMeasuresList[ dofIndex ]->velocity;
+      statesList[ 2 ] = axisMeasuresList[ dofIndex ]->acceleration;
+      inputsList[ 0 ] = axisMeasuresList[ 0 ]->force;
+      if( SystemLinearizer_AddSample(  dof->linearSystem, inputsList, statesList ) >= LINEARIZATION_MAX_SAMPLES )
+        SystemLinearizer_Identify( dof->linearSystem, loadImpedancesList );
+      
+      loadImpedancesList[ 0 ] = fmax( 0.0, loadImpedancesList[ 0 ] );
+      loadImpedancesList[ 1 ] = fmax( 0.0, loadImpedancesList[ 1 ] );
+      loadImpedancesList[ 2 ] = fmax( 0.1, loadImpedancesList[ 2 ] );
+      
+      if( controlState == CONTROL_CALIBRATION ) 
+      {       
+        dof->actuatorImpedancesMinList[ 0 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->actuatorImpedancesMinList[ 0 ] ) / 2;
+        dof->actuatorImpedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->actuatorImpedancesMinList[ 1 ] ) / 2;
+        dof->actuatorImpedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->inertia + dof->actuatorImpedancesMinList[ 2 ] ) / 2;
         
-        loadImpedancesList[ 0 ] = fmax( 0.0, loadImpedancesList[ 0 ] );
-        loadImpedancesList[ 1 ] = fmax( 0.0, loadImpedancesList[ 1 ] );
-        loadImpedancesList[ 2 ] = fmax( 0.1, loadImpedancesList[ 2 ] );
-        
-        if( controlState == CONTROL_CALIBRATION ) 
-        {       
-          dof->actuatorImpedancesMinList[ 0 ] = ( axisMeasuresList[ dofIndex ]->stiffness + dof->actuatorImpedancesMinList[ 0 ] ) / 2;
-          dof->actuatorImpedancesMinList[ 1 ] = ( axisMeasuresList[ dofIndex ]->damping + dof->actuatorImpedancesMinList[ 1 ] ) / 2;
-          dof->actuatorImpedancesMinList[ 2 ] = ( axisMeasuresList[ dofIndex ]->inertia + dof->actuatorImpedancesMinList[ 2 ] ) / 2;
-          
-          dof->loadImpedancesMinList[ 0 ] = ( loadImpedancesList[ 0 ] + dof->loadImpedancesMinList[ 0 ] ) / 2;
-          dof->loadImpedancesMinList[ 1 ] = ( loadImpedancesList[ 1 ] + dof->loadImpedancesMinList[ 1 ] ) / 2;
-          dof->loadImpedancesMinList[ 2 ] = ( loadImpedancesList[ 2 ] + dof->loadImpedancesMinList[ 2 ] ) / 2;
-        }
-        else if( controlState == CONTROL_OPERATION )
-        {
-          loadImpedancesList[ 0 ] = fmax( loadImpedancesList[ 0 ], dof->loadImpedancesMinList[ 0 ] );
-          loadImpedancesList[ 1 ] = fmax( loadImpedancesList[ 1 ], dof->loadImpedancesMinList[ 1 ] );
-          loadImpedancesList[ 2 ] = fmax( loadImpedancesList[ 2 ], dof->loadImpedancesMinList[ 2 ] );
-          // ddot(x) = u * 1/M_h - D_h/M_h * dot(x)
-          Kalman_SetTransitionFactor( dof->observer, 2, 1, -loadImpedancesList[ 1 ] / loadImpedancesList[ 2 ] );
-          ILQR_SetTransitionFactor( dof->regulator, 2, 1, -loadImpedancesList[ 1 ] / loadImpedancesList[ 2 ] );
-          Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / loadImpedancesList[ 2 ] );
-          ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / loadImpedancesList[ 2 ] );
-          // u = -K_h * ( x - x^d ) + (-f_int)
-          inputsList[ 0 ] = -loadImpedancesList[ 0 ] * measuresList[ 0 ] - axisMeasuresList[ 0 ]->force;
-          // z = Az + Bu + K( x - x^d - C( Az + Bu ) )
-          Kalman_Predict( dof->observer, inputsList, statesList );
-          Kalman_Update( dof->observer, measuresList, statesList );
-          // f_lqg = -Gz
-          ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
-        }
+        dof->loadImpedancesMinList[ 0 ] = ( loadImpedancesList[ 0 ] + dof->loadImpedancesMinList[ 0 ] ) / 2;
+        dof->loadImpedancesMinList[ 1 ] = ( loadImpedancesList[ 1 ] + dof->loadImpedancesMinList[ 1 ] ) / 2;
+        dof->loadImpedancesMinList[ 2 ] = ( loadImpedancesList[ 2 ] + dof->loadImpedancesMinList[ 2 ] ) / 2;
       }
-      // (-f_int^d) = f_lqg + f_fb
+      else if( controlState == CONTROL_OPERATION )
+      {
+        loadImpedancesList[ 0 ] = fmax( loadImpedancesList[ 0 ], dof->loadImpedancesMinList[ 0 ] );
+        loadImpedancesList[ 1 ] = fmax( loadImpedancesList[ 1 ], dof->loadImpedancesMinList[ 1 ] );
+        loadImpedancesList[ 2 ] = fmax( loadImpedancesList[ 2 ], dof->loadImpedancesMinList[ 2 ] );
+        // ddot(x) = u * 1/M_h - D_h/M_h * dot(x)
+        Kalman_SetTransitionFactor( dof->observer, 2, 1, -loadImpedancesList[ 1 ] / loadImpedancesList[ 2 ] );
+        ILQR_SetTransitionFactor( dof->regulator, 2, 1, -loadImpedancesList[ 1 ] / loadImpedancesList[ 2 ] );
+        Kalman_SetInputFactor( dof->observer, 2, 0, 1.0 / loadImpedancesList[ 2 ] );
+        ILQR_SetInputFactor( dof->regulator, 2, 0, 1.0 / loadImpedancesList[ 2 ] );
+        // u = -K_h * e + f_int
+        inputsList[ 0 ] = -loadImpedancesList[ 0 ] * measuresList[ 0 ] + axisMeasuresList[ 0 ]->force;
+        // z = Az + Bu + K( e - C( Az + Bu ) )
+        Kalman_Predict( dof->observer, inputsList, statesList );
+        Kalman_Update( dof->observer, measuresList, statesList );
+        // f_lqg = -Gz
+        ILQR_CalculateFeedback( dof->regulator, statesList, feedbacksList );
+        feedbacksList[ 0 ] = positionProportionalGain * measuresList[ 0 ];
+      }
+        
+      // f_int^d = f_lqg + f_fb
       interactionForceSetpoint = -feedbacksList[ 0 ] + axisSetpointsList[ 0 ]->force;
       // f_r^d = M_r * ddot(x) + D_r * dot(x) - (-f_int^d)
       actuatorForceSetpoint = axisMeasuresList[ dofIndex ]->inertia * axisMeasuresList[ dofIndex ]->acceleration
                               + axisMeasuresList[ dofIndex ]->damping * axisMeasuresList[ dofIndex ]->velocity
                               + interactionForceSetpoint;
       // Force-velocity PI control (SEA)
-      //double forceError = -interactionForceSetpoint - axisMeasuresList[ dofIndex ]->force;
-      //dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
-      //dof->lastForceError = forceError;
+      double forceError = interactionForceSetpoint - axisMeasuresList[ dofIndex ]->force;
+      dof->velocitySetpoint += forceProportionalGain * ( forceError - dof->lastForceError ) + forceIntegralGain * deltaTime * forceError;
+      dof->lastForceError = forceError;
       
       axisMeasuresList[ dofIndex ]->stiffness = loadImpedancesList[ 0 ];
       axisMeasuresList[ dofIndex ]->damping = loadImpedancesList[ 1 ];
